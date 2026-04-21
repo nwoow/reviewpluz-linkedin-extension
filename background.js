@@ -192,6 +192,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   log("Message received:", message.type);
 
+  if (message.type === "poll_queue") {
+    pollQueue()
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
   if (message.type === "execute_action") {
     executeNextAction()
       .then(() => sendResponse({ ok: true }))

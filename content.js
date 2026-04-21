@@ -1,130 +1,167 @@
 // ── Helpers ──
 
-function getText(el, selector) {
-  const node = el.querySelector(selector);
-  return node ? node.textContent.trim() : "";
+function getText(el, selectors) {
+  for (const sel of selectors) {
+    const node = el.querySelector(sel);
+    if (node && node.textContent.trim()) return node.textContent.trim();
+  }
+  return "";
 }
 
 // ── Search results: inject "Add to CRM" buttons ──
 
 function parseProfileCard(card) {
-  const name = getText(card, ".entity-result__title-text") ||
-               getText(card, "span[aria-hidden='true']") || "";
-  const headline = getText(card, ".entity-result__primary-subtitle") || "";
-  const locationRaw = getText(card, ".entity-result__secondary-subtitle") || "";
+  // Profile link — LinkedIn 2024/2025 uses app-aware-link with /in/ href
+  const anchor =
+    card.querySelector('a[href*="/in/"]') ||
+    card.querySelector("a.app-aware-link") ||
+    card.querySelector("a");
+  const profileUrl = anchor ? anchor.href.split("?")[0] : "";
 
-  // Try to extract company from headline (e.g. "Software Engineer at Acme")
+  // Name — multiple fallback selectors for different LinkedIn layouts
+  const name = getText(card, [
+    ".entity-result__title-text a span[aria-hidden='true']",
+    ".entity-result__title-text span[aria-hidden='true']",
+    "span[aria-hidden='true']",
+    ".artdeco-entity-lockup__title span",
+    "a[href*='/in/'] span[aria-hidden='true']",
+  ]);
+
+  // Headline / subtitle
+  const headline = getText(card, [
+    ".entity-result__primary-subtitle",
+    ".artdeco-entity-lockup__subtitle span",
+    ".entity-result__summary",
+  ]);
+
+  // Location
+  const location = getText(card, [
+    ".entity-result__secondary-subtitle",
+    ".artdeco-entity-lockup__caption span",
+  ]);
+
+  // Extract company from headline "Job Title at Company"
   const atIdx = headline.lastIndexOf(" at ");
   const company = atIdx !== -1 ? headline.slice(atIdx + 4) : "";
-  const title = atIdx !== -1 ? headline.slice(0, atIdx) : headline;
-
-  // Profile link
-  const anchor = card.querySelector("a.app-aware-link") || card.querySelector("a");
-  const profileUrl = anchor ? anchor.href.split("?")[0] : "";
+  const jobTitle = atIdx !== -1 ? headline.slice(0, atIdx) : headline;
 
   return {
     title: name || "LinkedIn Lead",
     contactPerson: name,
     companyName: company,
     linkedInUrl: profileUrl,
-    linkedInHeadline: title,
-    city: locationRaw,
+    linkedInHeadline: jobTitle,
+    city: location,
   };
 }
 
 function injectCrmButton(card) {
-  if (card.querySelector(".rlp-add-crm")) return; // already injected
+  if (card.querySelector(".rlp-add-crm")) return;
 
   const btn = document.createElement("button");
   btn.className = "rlp-add-crm";
   btn.textContent = "+ Add to CRM";
   btn.style.cssText =
     "margin-left:8px;padding:4px 10px;font-size:12px;border-radius:4px;" +
-    "background:#2563eb;color:#fff;border:none;cursor:pointer;font-family:inherit;";
+    "background:#2563eb;color:#fff;border:none;cursor:pointer;font-family:inherit;" +
+    "white-space:nowrap;z-index:9999;position:relative;";
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     const data = parseProfileCard(card);
+    console.log("[ReviewPluz] Adding lead:", data);
     btn.textContent = "Adding…";
     btn.disabled = true;
+
     chrome.runtime.sendMessage({ type: "add_lead", data }, (res) => {
+      if (chrome.runtime.lastError) {
+        console.error("[ReviewPluz] sendMessage error:", chrome.runtime.lastError.message);
+        btn.textContent = "Error";
+        btn.style.background = "#dc2626";
+        setTimeout(() => { btn.textContent = "+ Add to CRM"; btn.style.background = "#2563eb"; btn.disabled = false; }, 2000);
+        return;
+      }
       if (res && res.ok) {
         btn.textContent = "✓ Added";
         btn.style.background = "#16a34a";
+        console.log("[ReviewPluz] Lead added:", res.lead?._id);
       } else {
+        const errMsg = res?.error || "Failed";
+        console.error("[ReviewPluz] addLead failed:", errMsg);
         btn.textContent = "Failed";
         btn.style.background = "#dc2626";
-        setTimeout(() => {
-          btn.textContent = "+ Add to CRM";
-          btn.style.background = "#2563eb";
-          btn.disabled = false;
-        }, 2000);
+        btn.title = errMsg;
+        setTimeout(() => { btn.textContent = "+ Add to CRM"; btn.style.background = "#2563eb"; btn.disabled = false; }, 2000);
       }
     });
   });
 
-  // Attach to the action buttons row if it exists, otherwise append to card
+  // Try to attach near the action buttons, fall back to the card itself
   const actionsRow =
     card.querySelector(".entity-result__actions") ||
-    card.querySelector(".search-results__result-item") ||
+    card.querySelector(".artdeco-entity-lockup__metadata") ||
     card;
   actionsRow.appendChild(btn);
 }
 
 function injectSearchButtons() {
-  const cards = document.querySelectorAll(
-    ".entity-result__item, li.reusable-search__result-container"
-  );
+  // 2024/2025 LinkedIn search result selectors
+  const cards = document.querySelectorAll([
+    "li.reusable-search__result-container",
+    ".entity-result__item",
+    ".search-results-container li",
+    "ul.reusable-search__entity-result-list > li",
+  ].join(", "));
+
+  console.log(`[ReviewPluz] Found ${cards.length} profile cards`);
   cards.forEach(injectCrmButton);
 }
 
-// ── Messaging page: send DM ──
+// ── Messaging: send DM ──
 
 function getMessageInput() {
   return (
-    document.querySelector(".msg-form__contenteditable") ||
+    document.querySelector(".msg-form__contenteditable[contenteditable='true']") ||
+    document.querySelector("div.msg-form__contenteditable") ||
     document.querySelector("[data-testid='msg-form__msg-content-area']") ||
-    document.querySelector("div[contenteditable='true']")
+    document.querySelector("div[contenteditable='true'][role='textbox']")
   );
 }
 
 function getSendButton() {
   return (
-    document.querySelector(".msg-form__send-button") ||
-    document.querySelector("button[type='submit']") ||
-    document.querySelector("[data-testid='msg-form__send-btn']")
+    document.querySelector("button.msg-form__send-button") ||
+    document.querySelector("[data-testid='msg-form__send-btn']") ||
+    document.querySelector("button[type='submit'][aria-label*='Send']")
   );
 }
 
 async function sendDm(text) {
   const input = getMessageInput();
   if (!input) {
-    console.warn("[ReviewPluz] Message input not found");
+    console.warn("[ReviewPluz] DM input not found — make sure a conversation is open on this page");
     return false;
   }
-
   input.focus();
-  // Insert text using execCommand so LinkedIn's React state picks it up
   document.execCommand("selectAll", false, null);
   document.execCommand("insertText", false, text);
-
-  await new Promise((r) => setTimeout(r, 500));
-
+  await new Promise((r) => setTimeout(r, 600));
   const sendBtn = getSendButton();
   if (sendBtn && !sendBtn.disabled) {
     sendBtn.click();
+    console.log("[ReviewPluz] DM sent");
     return true;
   }
+  console.warn("[ReviewPluz] Send button not found or disabled");
   return false;
 }
 
-// ── Invitation manager page: send connect ──
+// ── Invitation manager: click Connect ──
 
 async function sendConnect(profileUrl) {
-  // Find the connect button for the matching profile
   const cards = document.querySelectorAll(
-    ".invitation-card, .mn-invitation-card"
+    ".invitation-card, .mn-invitation-card, [data-view-name='invitation-card']"
   );
   for (const card of cards) {
     const link = card.querySelector("a");
@@ -134,28 +171,32 @@ async function sendConnect(profileUrl) {
         card.querySelector("button[data-control-name='connect']");
       if (connectBtn) {
         connectBtn.click();
+        console.log("[ReviewPluz] Connect clicked for", profileUrl);
         return true;
       }
     }
   }
+  console.warn("[ReviewPluz] Could not find connect button for", profileUrl);
   return false;
 }
 
-// ── Observe DOM changes (LinkedIn is a SPA) ──
+// ── SPA navigation observer ──
 
-let searchObserver = null;
-
-function setupSearchObserver() {
-  if (searchObserver) searchObserver.disconnect();
-  searchObserver = new MutationObserver(() => {
-    if (window.location.pathname.startsWith("/search/results/people")) {
-      injectSearchButtons();
+let lastPath = location.pathname;
+const navObserver = new MutationObserver(() => {
+  if (location.pathname !== lastPath) {
+    lastPath = location.pathname;
+    if (location.pathname.startsWith("/search/results/people")) {
+      setTimeout(injectSearchButtons, 800);
     }
-  });
-  searchObserver.observe(document.body, { childList: true, subtree: true });
-}
+  }
+  if (location.pathname.startsWith("/search/results/people")) {
+    injectSearchButtons();
+  }
+});
+navObserver.observe(document.body, { childList: true, subtree: true });
 
-// ── Message listener (from background.js) ──
+// ── Message listener ──
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === "send_dm") {
@@ -170,9 +211,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // ── Init ──
 
-(function init() {
-  if (window.location.pathname.startsWith("/search/results/people")) {
-    injectSearchButtons();
-    setupSearchObserver();
-  }
-})();
+console.log("[ReviewPluz] content.js loaded on", location.pathname);
+if (location.pathname.startsWith("/search/results/people")) {
+  // Delay slightly for LinkedIn's SPA to finish rendering
+  setTimeout(injectSearchButtons, 1000);
+}

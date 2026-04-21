@@ -82,18 +82,12 @@ saveTokenBtn.addEventListener("click", () => {
 refreshBtn.addEventListener("click", () => {
   refreshBtn.disabled = true;
   refreshBtn.textContent = "Refreshing…";
-  chrome.runtime.sendMessage({ type: "execute_action" }, () => {
-    // Re-read queue after poll
+  chrome.runtime.sendMessage({ type: "poll_queue" }, () => {
     chrome.storage.local.get("queue", (data) => {
       updateQueueDisplay(data.queue || []);
       refreshBtn.disabled = false;
       refreshBtn.textContent = "Refresh Queue";
     });
-  });
-
-  // Also trigger a queue poll in the background
-  chrome.alarms.get("poll", (alarm) => {
-    if (!alarm) chrome.alarms.create("poll", { periodInMinutes: 5 });
   });
 });
 
