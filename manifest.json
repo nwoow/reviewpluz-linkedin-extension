@@ -5,7 +5,7 @@
   "description": "LinkedIn outreach automation for ReviewPluz CRM",
   "permissions": ["activeTab", "storage", "alarms"],
   "host_permissions": ["https://www.linkedin.com/*"],
-  "background": { "service_worker": "background.js" },
+  "background": { "service_worker": "background.js", "type": "module" },
   "content_scripts": [
     {
       "matches": ["https://www.linkedin.com/*"],
