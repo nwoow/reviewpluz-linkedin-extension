@@ -97,22 +97,42 @@ function injectCrmButton(card) {
     });
   });
 
-  // Try to attach near the action buttons, fall back to the card itself
+  // Attach near action buttons — try multiple slots, always fall back to card
   const actionsRow =
     card.querySelector(".entity-result__actions") ||
+    card.querySelector(".entity-result__simple-insight") ||
     card.querySelector(".artdeco-entity-lockup__metadata") ||
+    card.querySelector(".entity-result__summary") ||
+    card.querySelector("div[class*='entity-result']") ||
     card;
+  actionsRow.style.position = "relative";
   actionsRow.appendChild(btn);
 }
 
 function injectSearchButtons() {
-  // 2024/2025 LinkedIn search result selectors
-  const cards = document.querySelectorAll([
+  // Try specific selectors first
+  let cards = document.querySelectorAll([
     "li.reusable-search__result-container",
+    "li.scaffold-layout__list-item",
     ".entity-result__item",
-    ".search-results-container li",
     "ul.reusable-search__entity-result-list > li",
+    ".search-results-container li",
   ].join(", "));
+
+  // Nuclear fallback: any <li> that contains a /in/ profile link and is big enough
+  if (cards.length === 0) {
+    const allLi = document.querySelectorAll("li");
+    const filtered = [];
+    allLi.forEach((li) => {
+      if (li.querySelector('a[href*="/in/"]') && li.offsetHeight > 40) {
+        filtered.push(li);
+      }
+    });
+    cards = filtered;
+    if (filtered.length > 0) {
+      console.log(`[ReviewPluz] Used fallback selector — found ${filtered.length} cards`);
+    }
+  }
 
   console.log(`[ReviewPluz] Found ${cards.length} profile cards`);
   cards.forEach(injectCrmButton);
@@ -213,6 +233,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 console.log("[ReviewPluz] content.js loaded on", location.pathname);
 if (location.pathname.startsWith("/search/results/people")) {
-  // Delay slightly for LinkedIn's SPA to finish rendering
-  setTimeout(injectSearchButtons, 1000);
+  setTimeout(() => {
+    // Debug: log what LinkedIn's list container looks like so we can fix selectors
+    const ul = document.querySelector("ul.reusable-search__entity-result-list") ||
+               document.querySelector("ul[class*='reusable-search']") ||
+               document.querySelector("ul[class*='search']");
+    if (ul) {
+      const firstLi = ul.querySelector("li");
+      console.log("[ReviewPluz] List container:", ul.className);
+      console.log("[ReviewPluz] First li classes:", firstLi?.className || "none");
+    } else {
+      console.log("[ReviewPluz] No <ul> search list found — logging body snippet:", document.body.innerHTML.slice(0, 500));
+    }
+    injectSearchButtons();
+  }, 1500);
 }
