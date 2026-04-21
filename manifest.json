@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ReviewPluz LinkedIn",
+  "version": "1.0",
+  "description": "LinkedIn outreach automation for ReviewPluz CRM",
+  "permissions": ["activeTab", "storage", "alarms"],
+  "host_permissions": ["https://www.linkedin.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ReviewPluz LinkedIn"
+  }
+}

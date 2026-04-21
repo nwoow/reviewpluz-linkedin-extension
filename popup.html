@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReviewPluz LinkedIn</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/popup.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/>
+        <rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>
+      </svg>
+      <span>ReviewPluz LinkedIn</span>
+    </div>
+    <div id="status-dot" class="status-dot status-unknown" title="Token not set"></div>
+  </header>
+
+  <main class="body">
+    <!-- Token section -->
+    <section class="section">
+      <label class="label" for="token-input">API Token</label>
+      <div class="token-row">
+        <input id="token-input" type="password" class="input" placeholder="Paste your ReviewPluz API token" />
+        <button id="save-token" class="btn btn-primary btn-sm">Save</button>
+      </div>
+      <p id="token-msg" class="helper-text"></p>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- Stats section -->
+    <section class="section">
+      <p class="section-title">Today's Activity</p>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span id="connect-count" class="stat-number">0</span>
+          <span class="stat-label">Connections</span>
+          <span class="stat-limit">/ 25</span>
+        </div>
+        <div class="stat-card">
+          <span id="dm-count" class="stat-number">0</span>
+          <span class="stat-label">DMs</span>
+          <span class="stat-limit">/ 20</span>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- Queue section -->
+    <section class="section">
+      <p class="section-title">Queue</p>
+      <div class="queue-grid">
+        <div class="queue-item">
+          <span id="queue-connects" class="queue-number">—</span>
+          <span class="queue-label">pending connects</span>
+        </div>
+        <div class="queue-item">
+          <span id="queue-dms" class="queue-number">—</span>
+          <span class="queue-label">pending DMs</span>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- Actions -->
+    <section class="section actions-row">
+      <button id="refresh-btn" class="btn btn-outline">Refresh Queue</button>
+      <button id="run-btn" class="btn btn-primary">▶ Run Now</button>
+    </section>
+
+    <p id="run-msg" class="helper-text center"></p>
+  </main>
+</body>
+<script src="popup.js"></script>
+</html>
